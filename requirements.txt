@@ -1,0 +1,14 @@
+# Python dependencies for HC-MVMM.
+#
+# torch and spconv are intentionally NOT listed here so the user can install
+# wheels that match the local CUDA toolkit. See the "Environment" section in
+# README.md for the reference combination.
+
+numpy==1.24.4
+scipy==1.10.1
+scikit-image==0.21.0
+scikit-learn==1.3.2
+numba==0.58.1
+tqdm==4.67.1
+PyYAML==6.0.2
+tensorboardX==2.6.2.2

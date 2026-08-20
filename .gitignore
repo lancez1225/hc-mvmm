@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+build/
+dist/
+.eggs/
+*.cpython-*.so
+
+# Project artefacts
+logs/
+outputs/
+checkpoints/
+runs/
+data/kitti/
+data/kitti_object_eval_python/results/
+*.pth
+*.pkl
+events.out.tfevents.*
+
+# Editors / IDE
+.vscode/
+.idea/
+.DS_Store
+*.swp

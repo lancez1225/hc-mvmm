@@ -1,0 +1,124 @@
+# HC-MVMM final model: L1 colorization + L2 voxel confidence + L3 deformable BEV.
+# Corresponds to the "+ L1 + L2 + L3" row of Table 2 in the paper.
+
+random_seed: 444
+
+dataset:
+  type: 'KITTI'
+  batch_size: 4
+  class_names: ['Car', 'Pedestrian', 'Cyclist']
+  write_list: ['Car', 'Pedestrian', 'Cyclist']
+  point_cloud_range: [0, -40, -3, 70.4, 40, 1]
+
+  # L1: occlusion-aware colorization.
+  colorizer:
+    enabled: true
+    zbuffer:
+      depth_threshold: 0.5
+    confidence:
+      sigma_reproj: 2.0
+      depth_edge_threshold: 1.0
+      use_img_grad: true
+      img_grad_threshold: 0.1
+    object_segmentation:
+      enabled: true
+      layer_thickness: 5.0
+      dbscan_eps: 1.0
+      dbscan_min_samples: 3
+    propagation:
+      method: 'point'
+      sigma_spatial: 1.0
+      k_neighbors: 20
+      use_depth_constraint: true
+      tau_depth: 2.0
+      confidence_method: 'ratio'
+
+  range_image:
+    full_size: [2048, 64]
+    front_size: [512, 48]
+
+  augmentor_list:
+    - type: 'gt_sampling'
+      db_info_path: 'kitti_dbinfos_train.pkl'
+      filter_by_min_points: ['Car:10', 'Pedestrian:10', 'Cyclist:10']
+      filter_by_difficulty: [-1]
+      sample_groups: ['Car:5', 'Pedestrian:5', 'Cyclist:5']
+      random_sample: True
+    - type: 'random_rotation'
+      rotation_range: [-0.78539816, 0.78539816]
+    - type: 'random_scaling'
+      scaling_range: [0.95, 1.05]
+    - type: 'random_flip'
+
+model:
+  type: 'MVMM'
+
+  rv_backbone:
+    type: 'ResNet'
+    filters: [4]
+
+  # L2: confidence-aware voxel aggregation.
+  pv_bridge:
+    type: 'VFE'
+    voxel_size: [0.05, 0.05, 0.1]
+    filters: [32, 32, 64, 64, 128, 128]
+    use_hierarchical_conf: true
+    # 'proxy_avg' uses the mean confidence of all points in the frame (the
+    # whole colored-points proxy) as the per-voxel point-level term r_pt_v.
+    # 'per_voxel' falls back to Eq. 13 of the paper (in-voxel mean).
+    pt_conf_method: 'proxy_avg'
+
+  # L3: confidence-guided deformable BEV enhancement.
+  bev_backbone:
+    type: 'EnhancedBEVBackbone'
+    num_layers: [5, 5]
+    downsample_strides: [1, 2]
+    downsample_filters: [128, 256]
+    upsample_strides: [1, 2]
+    upsample_filters: [256, 256]
+    deformable_enhance:
+      enabled: true
+      enhance_dim: 64
+      n_heads: 4
+      n_points: 3
+      local_kernel: 3
+      surround_kernel: 11
+      gate_hidden_dim: 32
+      gate_dilation: 3
+      debug: false
+
+  head:
+    type: 'CenterPointHead'
+    common_channels: 64
+    top_k: 100
+    max_objs: 200
+    score_threshold: 0.1
+    feature_map_stride: 8
+    iou_branch:
+      enabled: true
+      loss_weight: 1.0
+      score_alpha: 0.5
+    loss_weights:
+      heatmap: 1.0
+      bbox_weight: 2.0
+      offset: 1.0
+      z: 1.0
+      dim: 1.0
+      rotation: 1.0
+
+optimizer:
+  type: 'AdamOneCycle'
+  lr: 0.003
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+
+trainer:
+  split: 'train'
+  epochs: 80
+  save_frequency: 20
+
+tester:
+  split: 'val'
+  score_thresh: 0.1
+  nms_thresh: 0.1
+  checkpoint: 'checkpoints/checkpoint_epoch_80.pth'
